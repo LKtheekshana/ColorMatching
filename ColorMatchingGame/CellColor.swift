@@ -11,21 +11,22 @@ enum CellColor: CaseIterable, Equatable {
 
     var color: Color {
         switch self {
-        case .red: return .red
-        case .green: return .green
-        case .blue: return .blue
-        case .yellow: return .yellow
-        case .gray: return .gray.opacity(0.4)
+        case .red: return Color(red: 1.0, green: 0.6, blue: 0.6)
+        case .green: return Color(red: 0.6, green: 1.0, blue: 0.6)
+        case .blue: return Color(red: 0.6, green: 0.8, blue: 1.0)
+        case .yellow: return Color(red: 1.0, green: 0.95, blue: 0.6)
+        case .gray: return Color.gray.opacity(0.2)
         }
     }
 
     func next() -> CellColor {
         let all = CellColor.allCases
         let index = all.firstIndex(of: self)!
-        return all[(index + 1) % all.count]
+        return all[(index+1) % all.count]
     }
 
-    var isPlayableColor: Bool {
-        self != .gray
-    }
+    var isPlayableColor: Bool { self != .gray }
+    static var playableColors: [CellColor] { [.red,.green,.blue,.yellow] }
 }
+
+

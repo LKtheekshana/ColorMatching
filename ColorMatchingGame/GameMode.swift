@@ -6,10 +6,8 @@
 //
 import Foundation
 
-enum GameMode: Int, Identifiable {
-    case easy = 3
-    case medium = 4
-    case hard = 5
+enum GameMode: Int, Identifiable, CaseIterable {
+    case easy = 3, medium = 4, hard = 5
 
     var id: Int { rawValue }
 
@@ -21,7 +19,7 @@ enum GameMode: Int, Identifiable {
         }
     }
 
-    var subtitle: String {
-        "\(rawValue) x \(rawValue) Grid"
-    }
+    var subtitle: String { "\(rawValue) x \(rawValue) Grid" }
+    var gridSize: Int { rawValue }
 }
+

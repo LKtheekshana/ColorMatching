@@ -5,199 +5,206 @@
 //  Created by COBSCCOMP242P-031 on 2026-01-16.
 //
 import SwiftUI
-import UIKit
 
 struct GameView: View {
-    let mode: GameMode
-    @State private var grid: [[CellColor]]
-    @State private var hasWon = false
-    @State private var animateGradient = false
+    @StateObject private var viewModel: GameViewModel
     @State private var tappedCell: (row: Int, col: Int)? = nil
+    @State private var playerName = ""
+    @State private var showLeaderboard = false
+    @State private var animateGradient = false
 
     init(mode: GameMode) {
-        self.mode = mode
-        self._grid = State(
-            initialValue: Array(
-                repeating: Array(repeating: .gray, count: mode.rawValue),
-                count: mode.rawValue
-            )
-        )
+        _viewModel = StateObject(wrappedValue: GameViewModel(mode: mode))
     }
 
     var body: some View {
         ZStack {
-            // Background Gradient
+            // Animated gradient background
             LinearGradient(
-                colors: animateGradient ? [.purple, .blue, .pink] : [.blue, .purple, .cyan],
+                colors: animateGradient ?
+                    [.purple.opacity(0.3), .blue.opacity(0.3), .pink.opacity(0.3)] :
+                    [.pink.opacity(0.3), .cyan.opacity(0.3), .purple.opacity(0.3)],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
             .ignoresSafeArea()
             .onAppear {
-                withAnimation(.linear(duration: 10).repeatForever(autoreverses: true)) {
+                withAnimation(.linear(duration: 20).repeatForever(autoreverses: true)) {
                     animateGradient.toggle()
                 }
             }
 
-            // Main Content
             VStack(spacing: 24) {
-                // Header
-                VStack(spacing: 6) {
-                    Text("Chromatic Grid")
-                        .font(.largeTitle)
-                        .fontWeight(.heavy)
-                        .foregroundColor(.white)
-
-                    Text("\(mode.title) Mode")
-                        .font(.title2)
-                        .foregroundColor(.white.opacity(0.85))
+                header
+                statsCard
+                gridView
+                HStack(spacing: 16) {
+                    hintButton
+                    resetButton
                 }
+            }
+            .padding()
 
-                // Grid
-                GeometryReader { geometry in
-                    let gridSize = min(geometry.size.width, geometry.size.height)
-                    let spacing: CGFloat = 10
-                    let squareSize = (gridSize - spacing * CGFloat(mode.rawValue - 1)) / CGFloat(mode.rawValue)
+            if viewModel.hasWon {
+                winOverlay
+            }
+        }
+    }
 
-                    VStack(spacing: spacing) {
-                        ForEach(0..<mode.rawValue, id: \.self) { row in
-                            HStack(spacing: spacing) {
-                                ForEach(0..<mode.rawValue, id: \.self) { col in
-                                    Button {
-                                        tappedCell = (row, col)
-                                        handleTap(row: row, col: col)
-                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                                            tappedCell = nil
-                                        }
-                                    } label: {
-                                        ZStack {
-                                            RoundedRectangle(cornerRadius: 12)
-                                                .fill(grid[row][col].color)
-                                                .overlay(
-                                                    LinearGradient(
-                                                        gradient: Gradient(colors: [Color.white.opacity(0.15), Color.clear]),
-                                                        startPoint: .topLeading,
-                                                        endPoint: .bottomTrailing
-                                                    )
-                                                )
-                                                .shadow(color: .black.opacity(0.2), radius: 4, x: 2, y: 2)
-                                                .overlay(
-                                                    RoundedRectangle(cornerRadius: 12)
-                                                        .stroke(Color.white.opacity(0.3), lineWidth: 1)
-                                                )
-                                                .scaleEffect(tappedCell?.row == row && tappedCell?.col == col ? 1.15 : (hasWon ? 1.05 : 1))
-                                                .brightness(hasWon ? 0.1 : 0)
-                                                .animation(.spring(response: 0.3, dampingFraction: 0.6), value: grid[row][col])
-                                        }
-                                        .frame(width: squareSize, height: squareSize)
-                                    }
-                                    .disabled(hasWon)
+    // MARK: - Header
+    private var header: some View {
+        VStack(spacing: 6) {
+            Text("Chromatic Grid")
+                .font(.largeTitle)
+                .fontWeight(.bold)
+                .foregroundColor(.black)
+
+            Text("\(viewModel.mode.title) Mode")
+                .font(.title3)
+                .foregroundColor(.gray)
+        }
+    }
+
+    // MARK: - Stats Card
+    private var statsCard: some View {
+        HStack(spacing: 24) {
+            statView(title: "Moves", value: "\(viewModel.moves)")
+            statView(title: "Score", value: "\(viewModel.score)")
+            statView(title: "Time", value: formatTime(viewModel.elapsedTime))
+        }
+        .padding()
+        .background(Color.white)
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 4)
+    }
+
+    private func statView(title: String, value: String) -> some View {
+        VStack {
+            Text(title)
+                .font(.caption)
+                .foregroundColor(.gray)
+            Text(value)
+                .font(.headline)
+                .foregroundColor(.black)
+        }
+    }
+
+    private func formatTime(_ seconds: Int) -> String {
+        String(format: "%02d:%02d", seconds / 60, seconds % 60)
+    }
+
+    // MARK: - Grid View
+    private var gridView: some View {
+        GeometryReader { geo in
+            let size = min(geo.size.width, geo.size.height)
+            let spacing: CGFloat = 12
+            let squareSize = (size - spacing * CGFloat(viewModel.mode.gridSize - 1)) / CGFloat(viewModel.mode.gridSize)
+
+            VStack(spacing: spacing) {
+                ForEach(0..<viewModel.mode.gridSize, id: \.self) { row in
+                    HStack(spacing: spacing) {
+                        ForEach(0..<viewModel.mode.gridSize, id: \.self) { col in
+                            CellView(
+                                color: viewModel.grid[row][col].color,
+                                size: squareSize,
+                                isTapped: tappedCell?.row == row && tappedCell?.col == col,
+                                isHint: viewModel.hintPosition?.row == row && viewModel.hintPosition?.col == col,
+                                isWon: viewModel.hasWon
+                            ) {
+                                tappedCell = (row, col)
+                                viewModel.handleTap(row: row, col: col)
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                                    tappedCell = nil
                                 }
                             }
                         }
                     }
-                    .frame(width: gridSize, height: gridSize, alignment: .center)
-                    .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
                 }
-                .frame(height: UIScreen.main.bounds.width)
-
-                // Reset Button – modern filled style
-                Button(action: {
-                    resetGame()
-                }) {
-                    Text("Reset Game")
-                        .fontWeight(.bold)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(
-                            LinearGradient(colors: [.pink, .purple], startPoint: .leading, endPoint: .trailing)
-                        )
-                        .foregroundColor(.white)
-                        .cornerRadius(12)
-                        .shadow(color: .black.opacity(0.25), radius: 5, x: 2, y: 2)
-                }
-                .padding(.horizontal)
             }
+            .frame(width: size, height: size)
+            .position(x: geo.size.width / 2, y: geo.size.height / 2)
+        }
+        .aspectRatio(1, contentMode: .fit)
+    }
+
+    // MARK: - Hint Button
+    private var hintButton: some View {
+        Button {
+            viewModel.giveHint()
+        } label: {
+            HStack {
+                Image(systemName: "lightbulb.fill")
+                Text("Hint")
+            }
+            .font(.headline)
             .padding()
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color.yellow.opacity(0.9))
+            .foregroundColor(.black)
+            .cornerRadius(12)
+        }
+    }
 
-            // Win Overlay – modern button
-            if hasWon {
-                ZStack {
-                    Color.black.opacity(0.5)
-                        .ignoresSafeArea()
+    // MARK: - Reset Button
+    private var resetButton: some View {
+        Button("Reset") {
+            viewModel.resetGame()
+            playerName = ""
+        }
+        .fontWeight(.semibold)
+        .padding()
+        .frame(maxWidth: .infinity)
+        .background(Color.white)
+        .foregroundColor(.black)
+        .cornerRadius(12)
+        .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 4)
+    }
 
-                    VStack(spacing: 20) {
-                        Text("🎉 You Win!")
-                            .font(.largeTitle)
-                            .fontWeight(.bold)
-                            .foregroundColor(.white)
+    // MARK: - Win Overlay
+    private var winOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.3).ignoresSafeArea()
+            ConfettiView() // Optional: confetti effect
 
-                        Button(action: {
-                            resetGame()
-                        }) {
-                            Text("Play Again")
-                                .fontWeight(.bold)
-                                .frame(maxWidth: 200)
-                                .padding()
-                                .background(
-                                    LinearGradient(colors: [.green, .mint], startPoint: .leading, endPoint: .trailing)
-                                )
-                                .foregroundColor(.white)
-                                .cornerRadius(12)
-                                .shadow(color: .black.opacity(0.25), radius: 5, x: 2, y: 2)
-                        }
+            VStack(spacing: 14) {
+                Text("🎉 You Win!")
+                    .font(.largeTitle)
+                    .fontWeight(.bold)
+
+                Text("Moves: \(viewModel.moves)  Score: \(viewModel.score)  Time: \(formatTime(viewModel.elapsedTime))")
+                    .font(.headline)
+
+                TextField("Enter your name", text: $playerName)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .padding(.horizontal)
+
+                HStack(spacing: 10) {
+                    Button("Submit Score") {
+                        let name = playerName.isEmpty ? "Player" : playerName
+                        viewModel.submitScore(playerName: name)
+                        showLeaderboard = true
                     }
                     .padding()
-                    .background(
-                        RoundedRectangle(cornerRadius: 20)
-                            .fill(Color.black.opacity(0.8))
-                            .shadow(radius: 10)
-                    )
+                    .background(Color.green)
+                    .cornerRadius(10)
+                    .foregroundColor(.white)
+
+                    Button("Play Again") {
+                        viewModel.resetGame()
+                        playerName = ""
+                    }
+                    .padding()
+                    .background(Color.blue)
+                    .cornerRadius(10)
+                    .foregroundColor(.white)
                 }
-                .zIndex(1)
-                .transition(.scale.combined(with: .opacity))
-                .animation(.spring(), value: hasWon)
+            }
+            .padding()
+            .background(Color.white)
+            .cornerRadius(20)
+            .shadow(radius: 8)
+            .sheet(isPresented: $showLeaderboard) {
+                LeaderboardView(mode: viewModel.mode)
             }
         }
-    }
-
-    // MARK: - Game Logic
-    func handleTap(row: Int, col: Int) {
-        guard !hasWon else { return }
-        grid[row][col] = grid[row][col].next()
-        playTapHaptic()
-        checkWinCondition()
-    }
-
-    func checkWinCondition() {
-        let first = grid[0][0]
-        guard first.isPlayableColor else { return }
-
-        for row in grid {
-            for cell in row where cell != first { return }
-        }
-
-        hasWon = true
-        playWinHaptic()
-    }
-
-    func resetGame() {
-        hasWon = false
-        grid = Array(
-            repeating: Array(repeating: .gray, count: mode.rawValue),
-            count: mode.rawValue
-        )
-    }
-
-    // MARK: - Haptic Feedback
-    func playTapHaptic() {
-        let generator = UIImpactFeedbackGenerator(style: .light)
-        generator.impactOccurred()
-    }
-
-    func playWinHaptic() {
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(.success)
     }
 }
