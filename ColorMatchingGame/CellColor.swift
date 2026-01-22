@@ -1,9 +1,3 @@
-//
-//  CellColor.swift
-//  ColorMatchingGame
-//
-//  Created by COBSCCOMP242P-031 on 2026-01-16.
-//
 import SwiftUI
 
 enum CellColor: CaseIterable, Equatable {
@@ -20,13 +14,35 @@ enum CellColor: CaseIterable, Equatable {
     }
 
     func next() -> CellColor {
-        let all = CellColor.allCases
-        let index = all.firstIndex(of: self)!
-        return all[(index+1) % all.count]
+        // Only playable colors should be in the rotation cycle
+        let playableColors = CellColor.playableColors
+        
+        // If current color is gray, start with the first playable color
+        if self == .gray {
+            return playableColors.first! // Returns red
+        }
+        
+        // If current color is a playable color, find next in playable cycle
+        if let currentIndex = playableColors.firstIndex(of: self) {
+            let nextIndex = (currentIndex + 1) % playableColors.count
+            return playableColors[nextIndex]
+        }
+        
+        // Fallback (should not happen)
+        return .red
     }
 
     var isPlayableColor: Bool { self != .gray }
-    static var playableColors: [CellColor] { [.red,.green,.blue,.yellow] }
+    static var playableColors: [CellColor] { [.red, .green, .blue, .yellow] }
+    
+    // Add description for win message
+    var description: String {
+        switch self {
+        case .red: return "Red"
+        case .green: return "Green"
+        case .blue: return "Blue"
+        case .yellow: return "Yellow"
+        case .gray: return "Gray"
+        }
+    }
 }
-
-

@@ -1,9 +1,3 @@
-//
-//  GameViewModel.swift
-//  ColorMatchingGame
-//
-//  Created by COBSCCOMP242P-031 on 2026-01-17.
-//
 import SwiftUI
 import Combine
 import UIKit
@@ -17,6 +11,11 @@ final class GameViewModel: ObservableObject {
     @Published var elapsedTime = 0
     @Published var bestTime: Int
     @Published var hintPosition: (row: Int, col: Int)? = nil
+    @Published var targetColor: CellColor? = nil
+    @Published var targetCount = 0
+    @Published var currentCount = 0
+    @Published var maxMoves: Int = 0
+    @Published var movesLeft: Int = 0
 
     let mode: GameMode
     private let bestScoreKey: String
@@ -30,11 +29,25 @@ final class GameViewModel: ObservableObject {
         self.bestScore = UserDefaults.standard.integer(forKey: bestScoreKey)
         self.bestTime = UserDefaults.standard.integer(forKey: bestTimeKey)
         self.grid = []
+        self.targetColor = nil
+        self.targetCount = calculateTargetCount()
+        self.maxMoves = calculateMaxMoves()
+        self.movesLeft = maxMoves
         resetGame()
+    }
+    
+    deinit {
+        timer?.invalidate()
     }
 
     func handleTap(row: Int, col: Int) {
         guard !hasWon else { return }
+        
+        // Check if moves are exhausted
+        if movesLeft <= 0 {
+            return
+        }
+        
         let positions = [(row, col), (row-1,col),(row+1,col),(row,col-1),(row,col+1)]
         for (r,c) in positions {
             if r >= 0 && r < grid.count && c >= 0 && c < grid[r].count {
@@ -42,8 +55,10 @@ final class GameViewModel: ObservableObject {
             }
         }
         moves += 1
+        movesLeft -= 1
         updateScore()
         hintPosition = nil
+        updateCurrentCount()
         playTapHaptic()
         checkWinCondition()
     }
@@ -54,11 +69,57 @@ final class GameViewModel: ObservableObject {
         score = 1000
         elapsedTime = 0
         hintPosition = nil
-        grid = Array(repeating: Array(repeating: CellColor.playableColors.randomElement()!, count: mode.gridSize), count: mode.gridSize)
+        
+        // Start with all gray cells
+        grid = Array(repeating: Array(repeating: CellColor.gray, count: mode.gridSize), count: mode.gridSize)
+        
+        // Set a random target color (excluding gray)
+        targetColor = CellColor.playableColors.randomElement()
+        targetCount = calculateTargetCount()
+        currentCount = 0
+        maxMoves = calculateMaxMoves()
+        movesLeft = maxMoves
+        
         startTimer()
     }
 
-    private func updateScore() { score = max(1000 - moves*20, 100) }
+    private func calculateTargetCount() -> Int {
+        // More challenging target counts
+        let totalCells = mode.gridSize * mode.gridSize
+        switch mode {
+        case .easy: return Int(Double(totalCells) * 0.6)  // 3x3 = 9 cells, target = 5-6
+        case .medium: return Int(Double(totalCells) * 0.7)  // 4x4 = 16 cells, target = 11-12
+        case .hard: return Int(Double(totalCells) * 0.8)  // 5x5 = 25 cells, target = 20
+        }
+    }
+    
+    private func calculateMaxMoves() -> Int {
+        // Limited moves based on difficulty
+        switch mode {
+        case .easy: return 15
+        case .medium: return 20
+        case .hard: return 25
+        }
+    }
+
+    private func updateCurrentCount() {
+        guard let target = targetColor else { return }
+        var count = 0
+        for row in grid {
+            for cell in row {
+                if cell == target {
+                    count += 1
+                }
+            }
+        }
+        currentCount = count
+    }
+
+    private func updateScore() {
+        // More penalty for moves
+        let calculatedScore = 1000 - moves * 15
+        score = max(calculatedScore, 100)
+    }
 
     private func startTimer() {
         timer?.invalidate()
@@ -68,18 +129,50 @@ final class GameViewModel: ObservableObject {
         }
     }
 
-    private func stopTimer() { timer?.invalidate(); timer=nil }
+    private func stopTimer() {
+        timer?.invalidate()
+        timer = nil
+    }
 
     private func checkWinCondition() {
-        let first = grid[0][0]
-        for row in grid {
-            for cell in row where cell != first { return }
+        guard let target = targetColor else { return }
+        
+        // CHALLENGE 1: Exact count requirement (must have EXACTLY target count)
+        if currentCount != targetCount {
+            return
         }
+        
+        // CHALLENGE 2: No adjacent same-colored cells (isolated target cells)
+        if hasAdjacentSameColorCells(target: target) {
+            return
+        }
+        
+        // If all challenges passed
         hasWon = true
         stopTimer()
         updateBestScore()
         updateBestTime()
         playWinHaptic()
+    }
+    
+    private func hasAdjacentSameColorCells(target: CellColor) -> Bool {
+        // Check if any target cell has adjacent target cell
+        for row in 0..<grid.count {
+            for col in 0..<grid[row].count {
+                if grid[row][col] == target {
+                    // Check adjacent cells
+                    let adjacentPositions = [(row-1, col), (row+1, col), (row, col-1), (row, col+1)]
+                    for (r, c) in adjacentPositions {
+                        if r >= 0 && r < grid.count && c >= 0 && c < grid[row].count {
+                            if grid[r][c] == target {
+                                return true // Found adjacent same color
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return false // No adjacent same color cells
     }
 
     private func updateBestScore() {
@@ -97,14 +190,40 @@ final class GameViewModel: ObservableObject {
     }
 
     func giveHint() {
-        let target = grid[0][0]
-        var candidates: [(Int,Int)] = []
+        guard let target = targetColor else { return }
+        
+        // Strategic hint: Find a cell that would create adjacent target cells
+        var candidates: [(Int, Int, Int)] = [] // (row, col, priority)
+        
         for row in 0..<grid.count {
             for col in 0..<grid[row].count {
-                if grid[row][col] != target { candidates.append((row,col)) }
+                if grid[row][col] != target {
+                    // Check if changing this cell would create adjacent target cells
+                    let adjacentCount = countAdjacentTargetCells(row: row, col: col, target: target)
+                    candidates.append((row, col, adjacentCount))
+                }
             }
         }
-        hintPosition = candidates.randomElement()
+        
+        // Sort by priority (cells that create more adjacent target cells)
+        candidates.sort { $0.2 > $1.2 }
+        if let bestCandidate = candidates.first {
+            hintPosition = (bestCandidate.0, bestCandidate.1)
+        }
+    }
+    
+    private func countAdjacentTargetCells(row: Int, col: Int, target: CellColor) -> Int {
+        var count = 0
+        let directions = [(row-1, col), (row+1, col), (row, col-1), (row, col+1)]
+        
+        for (r, c) in directions {
+            if r >= 0 && r < grid.count && c >= 0 && c < grid.count {
+                if grid[r][c] == target {
+                    count += 1
+                }
+            }
+        }
+        return count
     }
 
     func submitScore(playerName: String) {
@@ -112,6 +231,11 @@ final class GameViewModel: ObservableObject {
         LeaderboardManager.shared.save(entry: entry, for: mode.title)
     }
 
-    private func playTapHaptic() { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
-    private func playWinHaptic() { UINotificationFeedbackGenerator().notificationOccurred(.success) }
+    private func playTapHaptic() {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+    }
+    
+    private func playWinHaptic() {
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+    }
 }

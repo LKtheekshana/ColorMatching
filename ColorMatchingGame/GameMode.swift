@@ -1,9 +1,3 @@
-//
-//  GameMode.swift
-//  ColorMatchingGame
-//
-//  Created by COBSCCOMP242P-031 on 2026-01-16.
-//
 import Foundation
 
 enum GameMode: Int, Identifiable, CaseIterable {
