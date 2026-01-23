@@ -1,4 +1,3 @@
-// ColorMatchingGame.swift
 import SwiftUI
 
 struct ColorMatchingGame: View {
@@ -8,295 +7,397 @@ struct ColorMatchingGame: View {
     var body: some View {
         NavigationView {
             ZStack {
-                // Background gradient
+                // Modern gradient background
                 LinearGradient(
                     gradient: Gradient(colors: [
-                        Color(red: 0.95, green: 0.95, blue: 0.97),
-                        Color(red: 0.85, green: 0.89, blue: 0.95)
+                        Color(.systemGray6),
+                        Color(.systemBackground)
                     ]),
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
+                    startPoint: .top,
+                    endPoint: .bottom
                 )
                 .ignoresSafeArea()
                 
-                VStack(spacing: 0) {
-                    // Header
-                    headerView
-                    
-                    // Game area
-                    if !viewModel.isGameStarted {
-                        modeSelectionView
-                    } else {
-                        gameView
-                    }
-                    
-                    Spacer()
-                    
-                    // Bottom navigation
-                    bottomNavigationView
+                if !viewModel.isGameStarted {
+                    // Modern Mode Selection Screen
+                    modernModeSelectionScreen
+                } else {
+                    // Game Screen
+                    modernGameScreen
                 }
-                .padding(.horizontal)
             }
             .navigationBarHidden(true)
             .sheet(isPresented: $showingScoreboard) {
                 ScoreboardView(viewModel: viewModel)
             }
         }
+        .navigationViewStyle(StackNavigationViewStyle())
     }
     
-    // MARK: - Header View
+    // MARK: - Modern Mode Selection Screen
     
-    private var headerView: some View {
-        VStack(spacing: 8) {
-            Text("Color Match")
-                .font(.system(size: 36, weight: .bold, design: .rounded))
-                .foregroundColor(Color(red: 0.2, green: 0.2, blue: 0.3))
-            
-            Text(viewModel.isGameStarted ? "Memory Challenge" : "Find the matching color")
-                .font(.system(size: 16, weight: .medium, design: .rounded))
-                .foregroundColor(Color(red: 0.4, green: 0.4, blue: 0.5))
-        }
-        .padding(.top, 20)
-        .padding(.bottom, 30)
-    }
-    
-    // MARK: - Mode Selection View
-    
-    private var modeSelectionView: some View {
-        VStack(spacing: 30) {
-            Text("Select Difficulty")
-                .font(.system(size: 28, weight: .semibold, design: .rounded))
-                .foregroundColor(Color(red: 0.2, green: 0.2, blue: 0.3))
-            
-            ForEach(GameMode.allCases, id: \.self) { mode in
-                modeButton(mode: mode)
-            }
-        }
-        .transition(.scale.combined(with: .opacity))
-    }
-    
-    private func modeButton(mode: GameMode) -> some View {
-        Button(action: {
-            withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
-                viewModel.startGame(mode: mode)
-            }
-        }) {
-            VStack(spacing: 12) {
-                Text(mode.rawValue)
-                    .font(.system(size: 24, weight: .semibold, design: .rounded))
-                    .foregroundColor(.white)
-                
-                HStack(spacing: 15) {
-                    Label("\(mode.gridSize)×\(mode.gridSize)", systemImage: "square.grid.2x2")
-                    Label("\(mode.timeLimit)s", systemImage: "clock")
-                    Label("\(String(format: "%.1f", mode.revealTime))s", systemImage: "eye")
+    private var modernModeSelectionScreen: some View {
+        ScrollView {
+            VStack(spacing: 0) {
+                // Elegant Header
+                VStack(spacing: 12) {
+                    // Logo/Icon with gradient
+                    ZStack {
+                        Circle()
+                            .fill(
+                                AngularGradient(
+                                    gradient: Gradient(colors: [.blue, .purple, .blue]),
+                                    center: .center,
+                                    startAngle: .degrees(0),
+                                    endAngle: .degrees(360)
+                                )
+                            )
+                            .frame(width: 80, height: 80)
+                            .blur(radius: 8)
+                            .opacity(0.6)
+                        
+                        Image(systemName: "paintpalette.fill")
+                            .font(.system(size: 40))
+                            .foregroundColor(.white)
+                            .shadow(color: .black.opacity(0.2), radius: 4, x: 0, y: 2)
+                    }
+                    .padding(.top, 40)
+                    
+                    Text("COLOR MATCH")
+                        .font(.system(size: 34, weight: .heavy, design: .rounded))
+                        .foregroundColor(.primary)
+                        .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
+                    
+                    Text("Test Your Memory & Reflexes")
+                        .font(.system(size: 16, weight: .medium, design: .rounded))
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 40)
                 }
-                .font(.system(size: 14, weight: .medium))
-                .foregroundColor(.white.opacity(0.9))
+                .padding(.bottom, 40)
+                
+                // Difficulty Selection Cards
+                VStack(spacing: 20) {
+                    Text("SELECT DIFFICULTY")
+                        .font(.system(size: 18, weight: .semibold, design: .rounded))
+                        .foregroundColor(.secondary)
+                        .tracking(1)
+                        .padding(.bottom, 10)
+                    
+                    ForEach(GameMode.allCases, id: \.self) { mode in
+                        modernModeCard(mode: mode)
+                            .onTapGesture {
+                                withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+                                    viewModel.startGame(mode: mode)
+                                }
+                            }
+                    }
+                    
+                    // Quick Start Hint
+                    Text("Tap any card to begin")
+                        .font(.system(size: 14, design: .rounded))
+                        .foregroundColor(.gray)
+                        .padding(.top, 20)
+                        .opacity(0.7)
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 40)
             }
-            .frame(width: 280)
-            .padding(.vertical, 20)
-            .background(
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(modeGradient(mode))
-                    .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
-            )
-        }
-        .buttonStyle(ScaleButtonStyle())
-    }
-    
-    private func modeGradient(_ mode: GameMode) -> LinearGradient {
-        switch mode {
-        case .easy:
-            return LinearGradient(
-                colors: [Color(red: 0.2, green: 0.8, blue: 0.6), Color(red: 0.1, green: 0.7, blue: 0.5)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        case .medium:
-            return LinearGradient(
-                colors: [Color(red: 1, green: 0.6, blue: 0.3), Color(red: 1, green: 0.4, blue: 0.2)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        case .hard:
-            return LinearGradient(
-                colors: [Color(red: 1, green: 0.3, blue: 0.3), Color(red: 0.8, green: 0.2, blue: 0.2)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
         }
     }
     
-    // MARK: - Game View
-    
-    private var gameView: some View {
-        VStack(spacing: 25) {
-            // Score and Timer
-            HStack {
-                scoreView
+    private func modernModeCard(mode: GameMode) -> some View {
+        VStack(spacing: 0) {
+            // Card Header with Icon
+            HStack(spacing: 16) {
+                // Icon Container
+                ZStack {
+                    Circle()
+                        .fill(modeCardGradient(mode).opacity(0.9))
+                        .frame(width: 50, height: 50)
+                        .shadow(color: modeCardShadowColor(mode), radius: 8, x: 0, y: 4)
+                    
+                    Image(systemName: modeIconName(mode))
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundColor(.white)
+                        .shadow(color: .black.opacity(0.2), radius: 2, x: 0, y: 1)
+                }
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(mode.rawValue)
+                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                        .foregroundColor(modePrimaryColor(mode))
+                    
+                    Text(modeDescription(mode))
+                        .font(.system(size: 13, design: .rounded))
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
+                
                 Spacer()
-                timerView
+                
+                // Chevron indicator
+                Image(systemName: "chevron.right.circle.fill")
+                    .font(.system(size: 22))
+                    .foregroundColor(modePrimaryColor(mode).opacity(0.7))
             }
-            .padding(.horizontal)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 18)
             
-            // Reveal Progress
-            if viewModel.isRevealing {
-                revealProgressView
+            // Card Divider
+            Rectangle()
+                .fill(Color.gray.opacity(0.1))
+                .frame(height: 1)
+                .padding(.horizontal, 20)
+            
+            // Stats Row
+            HStack(spacing: 0) {
+                statItem(icon: "square.grid.2x2", value: "\(mode.gridSize)×\(mode.gridSize)")
+                
+                Divider()
+                    .frame(height: 20)
+                
+                statItem(icon: "clock", value: "\(mode.timeLimit)s")
+                
+                Divider()
+                    .frame(height: 20)
+                
+                statItem(icon: "eye", value: "\(String(format: "%.1f", mode.revealTime))s")
+                
+                Divider()
+                    .frame(height: 20)
+                
+                statItem(icon: "star.fill", value: "High: \(viewModel.getHighScore(for: mode))")
             }
-            
-            // Target Color Display
-            targetColorView
-            
-            // Game Status
-            gameStatusView
-            
-            // Grid
-            gridView
-            
-            // Instructions
-            instructionsView
+            .padding(.vertical, 12)
+            .background(Color.gray.opacity(0.05))
         }
-        .padding(.top, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color.white)
+                .shadow(color: Color.black.opacity(0.08), radius: 20, x: 0, y: 10)
+                .shadow(color: modePrimaryColor(mode).opacity(0.05), radius: 30, x: 0, y: 20)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(Color.gray.opacity(0.1), lineWidth: 1)
+        )
+    }
+    
+    // MARK: - Modern Game Screen
+    
+    private var modernGameScreen: some View {
+        GeometryReader { geometry in
+            VStack(spacing: 0) {
+                // Game Header
+                VStack(spacing: 4) {
+                    HStack {
+                        Button(action: {
+                            withAnimation {
+                                viewModel.endGame()
+                                viewModel.isGameStarted = false
+                            }
+                        }) {
+                            Image(systemName: "chevron.left.circle.fill")
+                                .font(.system(size: 24))
+                                .foregroundColor(.gray)
+                        }
+                        
+                        Spacer()
+                        
+                        Text("Color Match")
+                            .font(.system(size: 20, weight: .bold, design: .rounded))
+                            .foregroundColor(.primary)
+                        
+                        Spacer()
+                        
+                        Button(action: {
+                            showingScoreboard = true
+                        }) {
+                            Image(systemName: "trophy.fill")
+                                .font(.system(size: 20))
+                                .foregroundColor(.yellow)
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 10)
+                    
+                    Text("Memory Challenge")
+                        .font(.system(size: 14, design: .rounded))
+                        .foregroundColor(.secondary)
+                }
+                .padding(.bottom, 20)
+                
+                // Score and Timer
+                HStack {
+                    scoreView
+                    Spacer()
+                    timerView
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 20)
+                
+                // Target Color Display
+                VStack(spacing: 12) {
+                    Text("Find this color")
+                        .font(.system(size: 16, weight: .medium, design: .rounded))
+                        .foregroundColor(.secondary)
+                    
+                    ZStack {
+                        Circle()
+                            .fill(viewModel.targetColor)
+                            .frame(width: 100, height: 100)
+                            .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: 5)
+                            .overlay(
+                                Circle()
+                                    .stroke(Color.white, lineWidth: 4)
+                            )
+                        
+                        if !viewModel.isGameActive {
+                            Image(systemName: "questionmark")
+                                .font(.system(size: 36, weight: .bold))
+                                .foregroundColor(.white)
+                        }
+                    }
+                }
+                .padding(.bottom, 20)
+                
+                // Game Status
+                Group {
+                    if !viewModel.gameResult.isEmpty {
+                        Text(viewModel.gameResult)
+                            .font(.system(size: 18, weight: .bold, design: .rounded))
+                            .foregroundColor(.red)
+                    } else if viewModel.isRevealing {
+                        VStack(spacing: 8) {
+                            Text("Memorize Colors")
+                                .font(.system(size: 16, weight: .semibold, design: .rounded))
+                                .foregroundColor(.orange)
+                            
+                            // Progress bar
+                            GeometryReader { geo in
+                                ZStack(alignment: .leading) {
+                                    Capsule()
+                                        .fill(Color.gray.opacity(0.2))
+                                        .frame(height: 8)
+                                    
+                                    Capsule()
+                                        .fill(LinearGradient(
+                                            gradient: Gradient(colors: [.green, .blue]),
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        ))
+                                        .frame(width: geo.size.width * CGFloat(viewModel.revealProgress), height: 8)
+                                }
+                            }
+                            .frame(height: 8)
+                            .padding(.horizontal, 40)
+                        }
+                    } else {
+                        Text("Round \(viewModel.roundNumber)")
+                            .font(.system(size: 15, design: .rounded))
+                            .foregroundColor(.gray)
+                    }
+                }
+                .frame(height: 40)
+                .padding(.bottom, 10)
+                
+                // Color Grid
+                modernGridView(screenWidth: geometry.size.width)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 20)
+                
+                // Instructions
+                Text(viewModel.isRevealing ? "Memorize the colors quickly!" : "Tap tiles to find the match")
+                    .font(.system(size: 13, design: .rounded))
+                    .foregroundColor(.gray)
+                    .padding(.bottom, 20)
+            }
+        }
     }
     
     private var scoreView: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "star.fill")
-                .foregroundColor(.yellow)
+        VStack(spacing: 4) {
+            HStack(spacing: 6) {
+                Image(systemName: "star.fill")
+                    .foregroundColor(.yellow)
+                    .font(.system(size: 18))
+                Text("SCORE")
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .foregroundColor(.secondary)
+            }
+            
             Text("\(viewModel.score)")
-                .font(.system(size: 28, weight: .bold, design: .rounded))
-                .foregroundColor(Color(red: 0.2, green: 0.2, blue: 0.3))
+                .font(.system(size: 32, weight: .bold, design: .rounded))
+                .foregroundColor(.primary)
         }
         .padding(.horizontal, 20)
-        .padding(.vertical, 10)
+        .padding(.vertical, 12)
         .background(
-            Capsule()
+            RoundedRectangle(cornerRadius: 15)
                 .fill(Color.white)
-                .shadow(color: .black.opacity(0.1), radius: 5, x: 0, y: 3)
+                .shadow(color: .black.opacity(0.08), radius: 10, x: 0, y: 5)
         )
     }
     
     private var timerView: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "clock.fill")
-                .foregroundColor(timeColor)
+        VStack(spacing: 4) {
+            HStack(spacing: 6) {
+                Image(systemName: "clock.fill")
+                    .foregroundColor(timeColor)
+                    .font(.system(size: 18))
+                Text("TIME")
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .foregroundColor(.secondary)
+            }
+            
             Text("\(viewModel.timeRemaining)")
-                .font(.system(size: 28, weight: .bold, design: .rounded))
+                .font(.system(size: 32, weight: .bold, design: .rounded))
                 .foregroundColor(timeColor)
         }
         .padding(.horizontal, 20)
-        .padding(.vertical, 10)
+        .padding(.vertical, 12)
         .background(
-            Capsule()
+            RoundedRectangle(cornerRadius: 15)
                 .fill(Color.white)
-                .shadow(color: .black.opacity(0.1), radius: 5, x: 0, y: 3)
+                .shadow(color: .black.opacity(0.08), radius: 10, x: 0, y: 5)
         )
     }
     
     private var timeColor: Color {
         if viewModel.timeRemaining <= 10 {
-            return Color.red
+            return .red
         } else if viewModel.timeRemaining <= 20 {
-            return Color.orange
+            return .orange
         }
-        return Color.green
+        return .green
     }
     
-    private var revealProgressView: some View {
-        VStack(spacing: 8) {
-            Text("Memorize the colors!")
-                .font(.system(size: 16, weight: .semibold, design: .rounded))
-                .foregroundColor(Color(red: 0.9, green: 0.4, blue: 0.2))
-            
-            GeometryReader { geometry in
-                ZStack(alignment: .leading) {
-                    // Background
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(Color.white.opacity(0.3))
-                        .frame(height: 12)
-                    
-                    // Progress
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(
-                            LinearGradient(
-                                colors: [Color(red: 0.2, green: 0.8, blue: 0.6), Color(red: 0.1, green: 0.7, blue: 0.5)],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                        .frame(width: geometry.size.width * CGFloat(viewModel.revealProgress), height: 12)
-                }
-            }
-            .frame(height: 12)
-            .padding(.horizontal, 30)
-        }
-        .transition(.move(edge: .top).combined(with: .opacity))
-    }
-    
-    private var targetColorView: some View {
-        VStack(spacing: 15) {
-            Text("Find this color:")
-                .font(.system(size: 18, weight: .medium, design: .rounded))
-                .foregroundColor(Color(red: 0.4, green: 0.4, blue: 0.5))
-            
-            ZStack {
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(viewModel.targetColor)
-                    .frame(width: 120, height: 120)
-                    .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 5)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 20)
-                            .stroke(Color.white, lineWidth: 4)
-                    )
-                
-                if !viewModel.isGameActive {
-                    Image(systemName: "questionmark")
-                        .font(.system(size: 40, weight: .bold))
-                        .foregroundColor(.white)
-                        .shadow(color: .black.opacity(0.3), radius: 3)
-                }
-            }
-        }
-    }
-    
-    private var gameStatusView: some View {
-        Group {
-            if !viewModel.gameResult.isEmpty {
-                Text(viewModel.gameResult)
-                    .font(.system(size: 24, weight: .bold, design: .rounded))
-                    .foregroundColor(Color(red: 0.9, green: 0.3, blue: 0.3))
-                    .transition(.scale)
-            } else if viewModel.isRevealing {
-                Text("Memorizing...")
-                    .font(.system(size: 20, weight: .semibold, design: .rounded))
-                    .foregroundColor(Color(red: 0.2, green: 0.6, blue: 0.8))
-            } else {
-                Text("Round \(viewModel.roundNumber)")
-                    .font(.system(size: 18, weight: .medium, design: .rounded))
-                    .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.6))
-            }
-        }
-    }
-    
-    private var gridView: some View {
-        let columns = Array(repeating: GridItem(.flexible(), spacing: 15), count: viewModel.currentMode.gridSize)
+    private func modernGridView(screenWidth: CGFloat) -> some View {
+        let gridSize = viewModel.currentMode.gridSize
         
-        return LazyVGrid(columns: columns, spacing: 15) {
+        // Calculate maximum grid size
+        let maxGridWidth = screenWidth - 32
+        let spacing: CGFloat = gridSize >= 5 ? 6 : 8
+        let availableWidth = maxGridWidth - 24
+        let tileSize = (availableWidth - CGFloat(gridSize - 1) * spacing) / CGFloat(gridSize)
+        
+        let columns = Array(repeating: GridItem(.fixed(tileSize), spacing: spacing), count: gridSize)
+        
+        return LazyVGrid(columns: columns, spacing: spacing) {
             ForEach(viewModel.tiles) { tile in
-                tileView(tile)
+                modernTileView(tile, size: tileSize)
             }
         }
-        .padding(20)
+        .padding(16)
         .background(
-            RoundedRectangle(cornerRadius: 25)
+            RoundedRectangle(cornerRadius: 20)
                 .fill(Color.white)
-                .shadow(color: .black.opacity(0.1), radius: 20, x: 0, y: 10)
+                .shadow(color: .black.opacity(0.08), radius: 15, x: 0, y: 8)
         )
-        .padding(.horizontal)
     }
     
-    private func tileView(_ tile: ColorTile) -> some View {
+    private func modernTileView(_ tile: ColorTile, size: CGFloat) -> some View {
         Button(action: {
             guard viewModel.isGameActive && !viewModel.isRevealing else { return }
             
@@ -307,125 +408,151 @@ struct ColorMatchingGame: View {
             ZStack {
                 // Hidden state (question mark)
                 if !tile.isRevealed && tile.isHidden {
-                    RoundedRectangle(cornerRadius: 15)
-                        .fill(
-                            LinearGradient(
-                                colors: [Color(red: 0.9, green: 0.9, blue: 0.95), Color(red: 0.8, green: 0.85, blue: 0.92)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.gray.opacity(0.1))
+                        .frame(width: size, height: size)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.gray.opacity(0.2), lineWidth: 1)
                         )
-                        .aspectRatio(1, contentMode: .fit)
                         .overlay(
                             Image(systemName: "questionmark")
-                                .font(.system(size: 24, weight: .bold))
-                                .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.6))
+                                .font(.system(size: size * 0.25, weight: .bold, design: .rounded))
+                                .foregroundColor(.gray.opacity(0.5))
                         )
                 }
                 // Revealed state (actual color)
                 else if tile.isRevealed {
-                    RoundedRectangle(cornerRadius: 15)
+                    RoundedRectangle(cornerRadius: 12)
                         .fill(tile.color)
-                        .aspectRatio(1, contentMode: .fit)
+                        .frame(width: size, height: size)
+                        .shadow(color: .black.opacity(0.1), radius: 3, x: 0, y: 2)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.white.opacity(0.5), lineWidth: 2)
+                        )
                         .overlay(
                             Group {
                                 if tile.color == viewModel.targetColor && tile.isRevealed {
                                     Image(systemName: "checkmark.circle.fill")
-                                        .font(.system(size: 24))
+                                        .font(.system(size: size * 0.3))
                                         .foregroundColor(.white)
-                                        .shadow(color: .black.opacity(0.3), radius: 3)
+                                        .shadow(color: .black.opacity(0.3), radius: 2)
                                 }
                             }
                         )
                 }
                 // Flipping animation state
                 else {
-                    RoundedRectangle(cornerRadius: 15)
-                        .fill(
-                            LinearGradient(
-                                colors: [Color(red: 0.9, green: 0.9, blue: 0.95), Color(red: 0.8, green: 0.85, blue: 0.92)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .aspectRatio(1, contentMode: .fit)
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.gray.opacity(0.1))
+                        .frame(width: size, height: size)
                 }
             }
-            .shadow(color: .black.opacity(0.1), radius: 3, x: 0, y: 2)
-            .rotation3DEffect(
-                .degrees(tile.isRevealed ? 180 : 0),
-                axis: (x: 0, y: 1, z: 0)
-            )
-            .animation(.spring(response: 0.6, dampingFraction: 0.8), value: tile.isRevealed)
         }
-        .buttonStyle(TileButtonStyle())
+        .buttonStyle(ModernTileButtonStyle())
         .disabled(viewModel.isRevealing || !viewModel.isGameActive)
     }
     
-    private var instructionsView: some View {
-        Text(viewModel.isRevealing ? "Memorize the colors quickly!" : "Tap to find the matching color")
-            .font(.system(size: 14, weight: .medium, design: .rounded))
-            .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.6))
-            .padding(.top, 10)
+    // MARK: - Helper Functions for Mode Cards
+    
+    private func modeCardGradient(_ mode: GameMode) -> LinearGradient {
+        switch mode {
+        case .easy:
+            return LinearGradient(
+                gradient: Gradient(colors: [
+                    Color(red: 0.2, green: 0.8, blue: 0.6),
+                    Color(red: 0.1, green: 0.7, blue: 0.5)
+                ]),
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        case .medium:
+            return LinearGradient(
+                gradient: Gradient(colors: [
+                    Color(red: 1, green: 0.6, blue: 0.3),
+                    Color(red: 1, green: 0.4, blue: 0.2)
+                ]),
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        case .hard:
+            return LinearGradient(
+                gradient: Gradient(colors: [
+                    Color(red: 1, green: 0.3, blue: 0.3),
+                    Color(red: 0.8, green: 0.2, blue: 0.2)
+                ]),
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        }
     }
     
-    // MARK: - Bottom Navigation
-    
-    private var bottomNavigationView: some View {
-        HStack(spacing: 20) {
-            Button(action: {
-                showingScoreboard = true
-            }) {
-                HStack(spacing: 8) {
-                    Image(systemName: "trophy.fill")
-                    Text("Scores")
-                }
-                .font(.system(size: 16, weight: .semibold, design: .rounded))
-                .foregroundColor(.white)
-                .padding(.horizontal, 20)
-                .padding(.vertical, 12)
-                .background(
-                    Capsule()
-                        .fill(Color(red: 0.2, green: 0.6, blue: 0.8))
-                )
-            }
-            
-            if viewModel.isGameStarted {
-                Button(action: {
-                    withAnimation {
-                        viewModel.endGame()
-                    }
-                }) {
-                    Text("End Game")
-                        .font(.system(size: 16, weight: .semibold, design: .rounded))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 25)
-                        .padding(.vertical, 12)
-                        .background(
-                            Capsule()
-                                .fill(Color.red)
-                        )
-                }
-            }
+    private func modeCardShadowColor(_ mode: GameMode) -> Color {
+        switch mode {
+        case .easy:
+            return Color.green.opacity(0.3)
+        case .medium:
+            return Color.orange.opacity(0.3)
+        case .hard:
+            return Color.red.opacity(0.3)
         }
-        .padding(.bottom, 30)
+    }
+    
+    private func modeIconName(_ mode: GameMode) -> String {
+        switch mode {
+        case .easy:
+            return "leaf.fill"
+        case .medium:
+            return "flame.fill"
+        case .hard:
+            return "bolt.fill"
+        }
+    }
+    
+    private func modePrimaryColor(_ mode: GameMode) -> Color {
+        switch mode {
+        case .easy:
+            return Color.green
+        case .medium:
+            return Color.orange
+        case .hard:
+            return Color.red
+        }
+    }
+    
+    private func modeDescription(_ mode: GameMode) -> String {
+        switch mode {
+        case .easy:
+            return "Perfect for beginners"
+        case .medium:
+            return "Balanced challenge"
+        case .hard:
+            return "For memory masters"
+        }
+    }
+    
+    private func statItem(icon: String, value: String) -> some View {
+        VStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 14))
+                .foregroundColor(.gray)
+                .frame(height: 14)
+            
+            Text(value)
+                .font(.system(size: 12, weight: .medium, design: .rounded))
+                .foregroundColor(.primary)
+        }
+        .frame(maxWidth: .infinity)
     }
 }
 
 // MARK: - Button Styles
 
-struct ScaleButtonStyle: ButtonStyle {
+struct ModernTileButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? 0.95 : 1)
-            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: configuration.isPressed)
-    }
-}
-
-struct TileButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.9 : 1)
+            .scaleEffect(configuration.isPressed ? 0.92 : 1)
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: configuration.isPressed)
     }
 }

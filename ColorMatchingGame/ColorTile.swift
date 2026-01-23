@@ -1,4 +1,3 @@
-// ColorTile.swift
 import SwiftUI
 
 struct ColorTile: Identifiable {

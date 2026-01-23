@@ -1,4 +1,3 @@
-// GameViewModel.swift
 import SwiftUI
 import Combine
 
