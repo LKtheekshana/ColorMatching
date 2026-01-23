@@ -25,6 +25,11 @@ struct ColorMatchingGame: View {
                     // Game Screen
                     modernGameScreen
                 }
+                
+                // Name Input Overlay
+                if viewModel.showNameInput {
+                    nameInputOverlay
+                }
             }
             .navigationBarHidden(true)
             .sheet(isPresented: $showingScoreboard) {
@@ -32,6 +37,117 @@ struct ColorMatchingGame: View {
             }
         }
         .navigationViewStyle(StackNavigationViewStyle())
+    }
+    
+    // MARK: - Name Input Overlay
+    
+    private var nameInputOverlay: some View {
+        ZStack {
+            // Semi-transparent background
+            Color.black.opacity(0.5)
+                .ignoresSafeArea()
+                .onTapGesture {
+                    // Don't dismiss on background tap
+                }
+            
+            VStack(spacing: 20) {
+                // Congratulations Card
+                VStack(spacing: 15) {
+                    Image(systemName: "trophy.fill")
+                        .font(.system(size: 50))
+                        .foregroundColor(.yellow)
+                    
+                    Text("New High Score!")
+                        .font(.system(size: 28, weight: .bold, design: .rounded))
+                        .foregroundColor(.primary)
+                    
+                    Text("\(viewModel.score) points")
+                        .font(.system(size: 36, weight: .heavy, design: .rounded))
+                        .foregroundColor(.green)
+                    
+                    Text("in \(viewModel.currentMode.rawValue) Mode")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(.secondary)
+                }
+                .padding(25)
+                .background(
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(Color.white)
+                        .shadow(color: .black.opacity(0.2), radius: 20, x: 0, y: 10)
+                )
+                .padding(.horizontal, 30)
+                
+                // Name Input Card
+                VStack(spacing: 20) {
+                    Text("Enter Your Name")
+                        .font(.system(size: 20, weight: .semibold, design: .rounded))
+                        .foregroundColor(.primary)
+                    
+                    TextField("Your Name", text: $viewModel.playerName)
+                        .font(.system(size: 18, design: .rounded))
+                        .padding(15)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color(.systemGray6))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.blue.opacity(0.3), lineWidth: 1)
+                        )
+                        .padding(.horizontal, 20)
+                        .multilineTextAlignment(.center)
+                        .onSubmit {
+                            if !viewModel.playerName.isEmpty {
+                                viewModel.saveScore()
+                            }
+                        }
+                    
+                    HStack(spacing: 15) {
+                        Button(action: {
+                            viewModel.playerName = ""
+                            viewModel.showNameInput = false
+                        }) {
+                            Text("Skip")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(.gray)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .fill(Color(.systemGray5))
+                                )
+                        }
+                        
+                        Button(action: {
+                            if !viewModel.playerName.isEmpty {
+                                viewModel.saveScore()
+                            }
+                        }) {
+                            Text("Save Score")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .fill(viewModel.playerName.isEmpty ? Color.gray : Color.blue)
+                                )
+                        }
+                        .disabled(viewModel.playerName.isEmpty)
+                    }
+                    .padding(.horizontal, 20)
+                }
+                .padding(25)
+                .background(
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(Color.white)
+                        .shadow(color: .black.opacity(0.2), radius: 20, x: 0, y: 10)
+                )
+                .padding(.horizontal, 30)
+            }
+        }
+        .transition(.opacity.combined(with: .scale))
+        .animation(.spring(response: 0.3), value: viewModel.showNameInput)
     }
     
     // MARK: - Modern Mode Selection Screen
@@ -167,7 +283,7 @@ struct ColorMatchingGame: View {
                 Divider()
                     .frame(height: 20)
                 
-                statItem(icon: "star.fill", value: "High: \(viewModel.getHighScore(for: mode))")
+                statItem(icon: "target", value: "\(mode.targetMatches)×")
             }
             .padding(.vertical, 12)
             .background(Color.gray.opacity(0.05))
@@ -228,10 +344,14 @@ struct ColorMatchingGame: View {
                 }
                 .padding(.bottom, 20)
                 
-                // Score and Timer
-                HStack {
+                // Score, Timer, and Matches
+                HStack(spacing: 12) {
                     scoreView
+                    
+                    matchesProgressView
+                    
                     Spacer()
+                    
                     timerView
                 }
                 .padding(.horizontal, 20)
@@ -239,7 +359,7 @@ struct ColorMatchingGame: View {
                 
                 // Target Color Display
                 VStack(spacing: 12) {
-                    Text("Find this color")
+                    Text("Find \(viewModel.currentMode.targetMatches) color\(viewModel.currentMode.targetMatches > 1 ? "s" : "")")
                         .font(.system(size: 16, weight: .medium, design: .rounded))
                         .foregroundColor(.secondary)
                     
@@ -270,7 +390,7 @@ struct ColorMatchingGame: View {
                             .foregroundColor(.red)
                     } else if viewModel.isRevealing {
                         VStack(spacing: 8) {
-                            Text("Memorize Colors")
+                            Text("Memorize Colors (\(String(format: "%.1f", viewModel.currentMode.revealTime))s)")
                                 .font(.system(size: 16, weight: .semibold, design: .rounded))
                                 .foregroundColor(.orange)
                             
@@ -294,12 +414,20 @@ struct ColorMatchingGame: View {
                             .padding(.horizontal, 40)
                         }
                     } else {
-                        Text("Round \(viewModel.roundNumber)")
-                            .font(.system(size: 15, design: .rounded))
-                            .foregroundColor(.gray)
+                        VStack(spacing: 4) {
+                            Text("Round \(viewModel.roundNumber)")
+                                .font(.system(size: 15, design: .rounded))
+                                .foregroundColor(.gray)
+                            
+                            if viewModel.currentMode.targetMatches > 1 {
+                                Text("Find \(viewModel.currentMode.targetMatches) matches")
+                                    .font(.system(size: 13, design: .rounded))
+                                    .foregroundColor(.blue)
+                            }
+                        }
                     }
                 }
-                .frame(height: 40)
+                .frame(height: 50)
                 .padding(.bottom, 10)
                 
                 // Color Grid
@@ -308,10 +436,21 @@ struct ColorMatchingGame: View {
                     .padding(.bottom, 20)
                 
                 // Instructions
-                Text(viewModel.isRevealing ? "Memorize the colors quickly!" : "Tap tiles to find the match")
-                    .font(.system(size: 13, design: .rounded))
-                    .foregroundColor(.gray)
-                    .padding(.bottom, 20)
+                if viewModel.currentMode.targetMatches > 1 {
+                    Text(viewModel.isRevealing ?
+                         "Memorize all \(viewModel.currentMode.targetMatches) matching colors!" :
+                         "Find \(viewModel.currentMode.targetMatches) matching colors")
+                        .font(.system(size: 13, design: .rounded))
+                        .foregroundColor(.blue)
+                        .padding(.bottom, 20)
+                } else {
+                    Text(viewModel.isRevealing ?
+                         "Memorize the colors quickly!" :
+                         "Tap to find the matching color")
+                        .font(.system(size: 13, design: .rounded))
+                        .foregroundColor(.gray)
+                        .padding(.bottom, 20)
+                }
             }
         }
     }
@@ -333,6 +472,30 @@ struct ColorMatchingGame: View {
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 15)
+                .fill(Color.white)
+                .shadow(color: .black.opacity(0.08), radius: 10, x: 0, y: 5)
+        )
+    }
+    
+    private var matchesProgressView: some View {
+        VStack(spacing: 4) {
+            HStack(spacing: 6) {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundColor(.green)
+                    .font(.system(size: 18))
+                Text("MATCHES")
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .foregroundColor(.secondary)
+            }
+            
+            Text("\(viewModel.matchesFound)/\(viewModel.totalMatchesInRound)")
+                .font(.system(size: 24, weight: .bold, design: .rounded))
+                .foregroundColor(.green)
+        }
+        .padding(.horizontal, 15)
+        .padding(.vertical, 10)
         .background(
             RoundedRectangle(cornerRadius: 15)
                 .fill(Color.white)
@@ -421,7 +584,7 @@ struct ColorMatchingGame: View {
                                 .foregroundColor(.gray.opacity(0.5))
                         )
                 }
-                // Revealed state (actual color)
+                // Revealed state (actual color) - Thicker border for matching tiles
                 else if tile.isRevealed {
                     RoundedRectangle(cornerRadius: 12)
                         .fill(tile.color)
@@ -429,17 +592,11 @@ struct ColorMatchingGame: View {
                         .shadow(color: .black.opacity(0.1), radius: 3, x: 0, y: 2)
                         .overlay(
                             RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.white.opacity(0.5), lineWidth: 2)
-                        )
-                        .overlay(
-                            Group {
-                                if tile.color == viewModel.targetColor && tile.isRevealed {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .font(.system(size: size * 0.3))
-                                        .foregroundColor(.white)
-                                        .shadow(color: .black.opacity(0.3), radius: 2)
-                                }
-                            }
+                                .stroke(
+                                    // Thicker white border for matching tiles
+                                    Color.white,
+                                    lineWidth: tile.color == viewModel.targetColor && tile.isRevealed ? 4 : 2
+                                )
                         )
                 }
                 // Flipping animation state

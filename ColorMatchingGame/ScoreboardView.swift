@@ -4,6 +4,7 @@ struct ScoreboardView: View {
     @Environment(\.presentationMode) var presentationMode
     @ObservedObject var viewModel: GameViewModel
     @State private var selectedTab: Int = 0
+    @State private var selectedMode: GameMode = .easy
     
     var body: some View {
         NavigationView {
@@ -16,9 +17,23 @@ struct ScoreboardView: View {
                     headerView
                         .frame(height: 100)
                     
-                    // Tab Selector - Fixed height
-                    tabSelectorView
-                        .frame(height: 50)
+                    // Mode Picker and Tab Selector
+                    VStack(spacing: 0) {
+                        // Mode Picker
+                        Picker("Mode", selection: $selectedMode) {
+                            ForEach(GameMode.allCases, id: \.self) { mode in
+                                Text(mode.rawValue).tag(mode)
+                            }
+                        }
+                        .pickerStyle(SegmentedPickerStyle())
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        
+                        // Tab Selector
+                        tabSelectorView
+                            .frame(height: 50)
+                    }
+                    .background(Color.white)
                     
                     // Content - Takes remaining space
                     if selectedTab == 0 {
@@ -90,21 +105,23 @@ struct ScoreboardView: View {
     private var highScoresView: some View {
         ScrollView {
             VStack(spacing: 15) {
-                ForEach(GameMode.allCases, id: \.self) { mode in
-                    scoreCard(for: mode)
+                // Top High Score Card
+                if let topScore = viewModel.getHighScores(for: selectedMode).first {
+                    topScoreCard(score: topScore)
                         .padding(.horizontal, 15)
                 }
                 
-                // Stats Summary
+                // High Scores List
                 VStack(spacing: 12) {
-                    Text("Summary")
+                    Text("Leaderboard - \(selectedMode.rawValue)")
                         .font(.system(size: 18, weight: .bold))
                         .foregroundColor(.black)
                         .padding(.top, 5)
                     
-                    HStack(spacing: 25) {
-                        statCard(title: "Total Games", value: "\(totalGamesPlayed)", icon: "gamecontroller.fill", color: .blue)
-                        statCard(title: "Best Mode", value: bestMode, icon: "crown.fill", color: .orange)
+                    if viewModel.getHighScores(for: selectedMode).isEmpty {
+                        emptyHighScoresView
+                    } else {
+                        highScoresListView
                     }
                 }
                 .padding(15)
@@ -121,102 +138,140 @@ struct ScoreboardView: View {
         .background(Color(.systemGray6))
     }
     
-    private func scoreCard(for mode: GameMode) -> some View {
-        let highScore = viewModel.getHighScore(for: mode)
-        
-        return HStack {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 8) {
-                    // Difficulty Icon
-                    Image(systemName: difficultyIcon(for: mode))
-                        .font(.system(size: 16))
-                        .foregroundColor(modeColor(for: mode))
+    private func topScoreCard(score: HighScore) -> some View {
+        VStack(spacing: 15) {
+            HStack(spacing: 12) {
+                Image(systemName: "crown.fill")
+                    .font(.system(size: 30))
+                    .foregroundColor(.yellow)
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Top Score")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.secondary)
                     
-                    Text(mode.rawValue)
-                        .font(.system(size: 20, weight: .bold))
-                        .foregroundColor(.white)
+                    Text(score.name)
+                        .font(.system(size: 22, weight: .bold))
+                        .foregroundColor(.primary)
                 }
                 
-                HStack(spacing: 12) {
-                    Label("\(mode.gridSize)×\(mode.gridSize)", systemImage: "grid")
-                    Label("\(mode.timeLimit)s", systemImage: "clock")
-                    Label("\(String(format: "%.1f", mode.revealTime))s", systemImage: "eye")
-                }
-                .font(.system(size: 12, weight: .medium))
-                .foregroundColor(.white.opacity(0.9))
-            }
-            
-            Spacer()
-            
-            VStack(alignment: .trailing, spacing: 4) {
-                Text("HIGH SCORE")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundColor(.white.opacity(0.8))
-                    .tracking(1)
+                Spacer()
                 
-                if highScore > 0 {
-                    Text("\(highScore)")
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text("SCORE")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(.secondary)
+                    
+                    Text("\(score.score)")
                         .font(.system(size: 32, weight: .bold))
-                        .foregroundColor(.white)
-                } else {
-                    VStack(spacing: 6) {
-                        Image(systemName: "trophy.slash")
-                            .font(.system(size: 20))
-                            .foregroundColor(.white.opacity(0.7))
-                        
-                        Text("Not Played")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.white.opacity(0.7))
-                    }
-                    .padding(.vertical, 8)
+                        .foregroundColor(.blue)
                 }
             }
+            
+            HStack {
+                Label("\(selectedMode.gridSize)×\(selectedMode.gridSize)", systemImage: "grid")
+                Label("\(selectedMode.timeLimit)s", systemImage: "clock")
+                Label("\(String(format: "%.1f", selectedMode.revealTime))s", systemImage: "eye")
+                Label("\(selectedMode.targetMatches)×", systemImage: "target")
+                Spacer()
+                Text(score.formattedDate)
+                    .font(.system(size: 11))
+                    .foregroundColor(.gray)
+            }
+            .font(.system(size: 12, weight: .medium))
+            .foregroundColor(.gray)
         }
         .padding(20)
         .background(
             RoundedRectangle(cornerRadius: 15)
-                .fill(modeGradient(for: mode))
-                .shadow(color: .black.opacity(0.1), radius: 5, x: 0, y: 3)
+                .fill(
+                    LinearGradient(
+                        gradient: Gradient(colors: [
+                            Color.blue.opacity(0.1),
+                            Color.purple.opacity(0.05)
+                        ]),
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 15)
+                        .stroke(Color.blue.opacity(0.2), lineWidth: 1)
+                )
         )
     }
     
-    private func difficultyIcon(for mode: GameMode) -> String {
-        switch mode {
-        case .easy: return "leaf.fill"
-        case .medium: return "flame.fill"
-        case .hard: return "bolt.fill"
+    private var highScoresListView: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(viewModel.getHighScores(for: selectedMode).enumerated()), id: \.element.id) { index, score in
+                highScoreRow(score: score, rank: index + 1)
+                
+                if index < viewModel.getHighScores(for: selectedMode).count - 1 {
+                    Divider()
+                        .padding(.horizontal, 10)
+                }
+            }
         }
     }
     
-    private func modeColor(for mode: GameMode) -> Color {
-        switch mode {
-        case .easy: return .green
-        case .medium: return .orange
-        case .hard: return .red
+    private func highScoreRow(score: HighScore, rank: Int) -> some View {
+        HStack(spacing: 12) {
+            // Rank Badge
+            ZStack {
+                Circle()
+                    .fill(rankBadgeColor(rank))
+                    .frame(width: 36, height: 36)
+                
+                Text("\(rank)")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundColor(.white)
+            }
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(score.name)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.primary)
+                
+                Text(score.formattedDate)
+                    .font(.system(size: 11))
+                    .foregroundColor(.gray)
+            }
+            
+            Spacer()
+            
+            Text("\(score.score)")
+                .font(.system(size: 20, weight: .bold))
+                .foregroundColor(.blue)
+        }
+        .padding(.vertical, 10)
+        .padding(.horizontal, 5)
+    }
+    
+    private func rankBadgeColor(_ rank: Int) -> Color {
+        switch rank {
+        case 1: return .yellow
+        case 2: return .gray
+        case 3: return .orange
+        default: return .blue
         }
     }
     
-    private func modeGradient(for mode: GameMode) -> LinearGradient {
-        switch mode {
-        case .easy:
-            return LinearGradient(
-                gradient: Gradient(colors: [.green, .green.opacity(0.7)]),
-                startPoint: .leading,
-                endPoint: .trailing
-            )
-        case .medium:
-            return LinearGradient(
-                gradient: Gradient(colors: [.orange, .orange.opacity(0.7)]),
-                startPoint: .leading,
-                endPoint: .trailing
-            )
-        case .hard:
-            return LinearGradient(
-                gradient: Gradient(colors: [.red, .red.opacity(0.7)]),
-                startPoint: .leading,
-                endPoint: .trailing
-            )
+    private var emptyHighScoresView: some View {
+        VStack(spacing: 15) {
+            Image(systemName: "trophy.slash")
+                .font(.system(size: 40))
+                .foregroundColor(.gray.opacity(0.5))
+            
+            Text("No High Scores Yet")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundColor(.gray)
+            
+            Text("Play \(selectedMode.rawValue) mode to set the first record!")
+                .font(.system(size: 14))
+                .foregroundColor(.gray.opacity(0.7))
+                .multilineTextAlignment(.center)
         }
+        .padding(30)
     }
     
     // MARK: - Game Stats View
@@ -224,21 +279,41 @@ struct ScoreboardView: View {
     private var gameStatsView: some View {
         ScrollView {
             VStack(spacing: 15) {
-                // Performance Metrics
-                VStack(spacing: 15) {
-                    Text("Performance Metrics")
-                        .font(.system(size: 20, weight: .bold))
-                        .foregroundColor(.black)
-                        .padding(.bottom, 5)
+                // Player Info Card
+                VStack(spacing: 12) {
+                    HStack {
+                        Image(systemName: "person.circle.fill")
+                            .font(.system(size: 24))
+                            .foregroundColor(.blue)
+                        
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Player")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(.secondary)
+                            
+                            Text(viewModel.playerName.isEmpty ? "Guest" : viewModel.playerName)
+                                .font(.system(size: 18, weight: .bold))
+                                .foregroundColor(.primary)
+                        }
+                        
+                        Spacer()
+                        
+                        Text("Total Games: \(totalGamesPlayed)")
+                            .font(.system(size: 12))
+                            .foregroundColor(.secondary)
+                    }
                     
+                    Divider()
+                    
+                    // Performance Metrics
                     LazyVGrid(columns: [
                         GridItem(.flexible()),
                         GridItem(.flexible())
                     ], spacing: 15) {
                         statCard(title: "Total Score", value: "\(totalScore)", icon: "star.fill", color: .yellow)
                         statCard(title: "Avg. Score", value: "\(averageScore)", icon: "chart.line.uptrend.xyaxis", color: .green)
-                        statCard(title: "Games Played", value: "\(totalGamesPlayed)", icon: "gamecontroller.fill", color: .blue)
                         statCard(title: "Best Score", value: "\(bestOverallScore)", icon: "trophy.fill", color: .orange)
+                        statCard(title: "Best Mode", value: "\(bestMode)", icon: "crown.fill", color: .purple)
                     }
                 }
                 .padding(15)
@@ -249,16 +324,14 @@ struct ScoreboardView: View {
                 )
                 .padding(.horizontal, 15)
                 
-                // Tips Section
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("🎯 Tips to Improve")
+                // Mode Performance
+                VStack(spacing: 15) {
+                    Text("Mode Performance")
                         .font(.system(size: 18, weight: .bold))
                         .foregroundColor(.black)
                     
-                    VStack(alignment: .leading, spacing: 10) {
-                        tipRow(icon: "brain.head.profile", title: "Memory Strategy", description: "Focus on color positions during reveal time")
-                        tipRow(icon: "clock.badge.checkmark", title: "Time Management", description: "Don't rush - accuracy is better than speed")
-                        tipRow(icon: "arrow.triangle.2.circlepath", title: "Practice Makes Perfect", description: "Start with Easy mode to build confidence")
+                    ForEach(GameMode.allCases, id: \.self) { mode in
+                        modePerformanceRow(mode: mode)
                     }
                 }
                 .padding(15)
@@ -276,24 +349,43 @@ struct ScoreboardView: View {
         .background(Color(.systemGray6))
     }
     
-    private func tipRow(icon: String, title: String, description: String) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: icon)
-                .font(.system(size: 16))
-                .foregroundColor(.blue)
-                .frame(width: 25)
-            
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.black)
+    private func modePerformanceRow(mode: GameMode) -> some View {
+        let scores = viewModel.getHighScores(for: mode)
+        let topScore = scores.first?.score ?? 0
+        
+        return HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(mode.rawValue)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.primary)
                 
-                Text(description)
-                    .font(.system(size: 12, weight: .regular))
+                Text("Best: \(topScore)")
+                    .font(.system(size: 12))
                     .foregroundColor(.gray)
-                    .fixedSize(horizontal: false, vertical: true)
             }
+            
+            Spacer()
+            
+            Text("\(scores.count) records")
+                .font(.system(size: 12))
+                .foregroundColor(.secondary)
+            
+            // Score indicator
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(Color.gray.opacity(0.2))
+                        .frame(height: 6)
+                    
+                    let width = min(CGFloat(topScore) / 500.0 * geometry.size.width, geometry.size.width)
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(modeColor(for: mode))
+                        .frame(width: width, height: 6)
+                }
+            }
+            .frame(width: 60, height: 6)
         }
+        .padding(.vertical, 8)
     }
     
     // MARK: - Current Score View
@@ -383,27 +475,49 @@ struct ScoreboardView: View {
         }
     }
     
+    private func modeColor(for mode: GameMode) -> Color {
+        switch mode {
+        case .easy: return .green
+        case .medium: return .orange
+        case .hard: return .red
+        }
+    }
+    
     private var totalScore: Int {
-        GameMode.allCases.reduce(0) { $0 + viewModel.getHighScore(for: $1) }
+        viewModel.getHighScores(for: .easy).reduce(0) { $0 + $1.score } +
+        viewModel.getHighScores(for: .medium).reduce(0) { $0 + $1.score } +
+        viewModel.getHighScores(for: .hard).reduce(0) { $0 + $1.score }
     }
     
     private var totalGamesPlayed: Int {
-        GameMode.allCases.filter { viewModel.getHighScore(for: $0) > 0 }.count
+        viewModel.getHighScores(for: .easy).count +
+        viewModel.getHighScores(for: .medium).count +
+        viewModel.getHighScores(for: .hard).count
     }
     
     private var averageScore: Int {
-        let playedModes = GameMode.allCases.filter { viewModel.getHighScore(for: $0) > 0 }
-        guard !playedModes.isEmpty else { return 0 }
-        return totalScore / playedModes.count
+        guard totalGamesPlayed > 0 else { return 0 }
+        return totalScore / totalGamesPlayed
     }
     
     private var bestOverallScore: Int {
-        GameMode.allCases.map { viewModel.getHighScore(for: $0) }.max() ?? 0
+        let easyBest = viewModel.getHighScores(for: .easy).first?.score ?? 0
+        let mediumBest = viewModel.getHighScores(for: .medium).first?.score ?? 0
+        let hardBest = viewModel.getHighScores(for: .hard).first?.score ?? 0
+        return max(easyBest, mediumBest, hardBest)
     }
     
     private var bestMode: String {
-        let modeScores = GameMode.allCases.map { (mode: $0, score: viewModel.getHighScore(for: $0)) }
-        let best = modeScores.max { $0.score < $1.score }
-        return best?.mode.rawValue ?? "None"
+        let easyBest = viewModel.getHighScores(for: .easy).first?.score ?? 0
+        let mediumBest = viewModel.getHighScores(for: .medium).first?.score ?? 0
+        let hardBest = viewModel.getHighScores(for: .hard).first?.score ?? 0
+        
+        if easyBest >= mediumBest && easyBest >= hardBest {
+            return "Easy"
+        } else if mediumBest >= easyBest && mediumBest >= hardBest {
+            return "Medium"
+        } else {
+            return "Hard"
+        }
     }
 }
