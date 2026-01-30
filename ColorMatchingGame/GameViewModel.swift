@@ -2,7 +2,7 @@ import SwiftUI
 import Combine
 
 struct HighScore: Identifiable, Codable {
-    let id = UUID()
+    var id = UUID()
     let name: String
     let score: Int
     let mode: String
@@ -274,15 +274,41 @@ class GameViewModel: ObservableObject {
             date: Date()
         )
         
+        // Add to local storage
         highScores.append(newHighScore)
-        // Sort by score descending
         highScores.sort { $0.score > $1.score }
-        // Keep only top 10 scores per mode
-        highScores = Array(highScores.prefix(30)) // 10 per mode × 3 modes
+        highScores = Array(highScores.prefix(30))
         
         saveHighScores()
         savePlayerName()
+        
+        // NEW: Save to Firebase
+        FirebaseManager.shared.saveHighScore(newHighScore) { error in
+            if let error = error {
+                print("❌ Firebase save error: \(error.localizedDescription)")
+            } else {
+                print("✅ Score saved to Firebase successfully!")
+            }
+        }
+        
         showNameInput = false
+    }
+    
+    // Add this to GameViewModel class
+    func loadHighScoresFromFirebase() {
+        let mode = currentMode.rawValue
+        FirebaseManager.shared.fetchHighScores(for: mode) { scores, error in
+            if let error = error {
+                print("Error loading scores: \(error.localizedDescription)")
+                return
+            }
+            
+            if let scores = scores {
+                DispatchQueue.main.async {
+                    self.highScores = scores
+                }
+            }
+        }
     }
     
     private func isHighScore() -> Bool {
