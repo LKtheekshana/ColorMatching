@@ -73,8 +73,8 @@ struct ColorMatchingGame: View {
                 .background(
                     RoundedRectangle(cornerRadius: 20)
                         .fill(Color.white)
-                        .shadow(color: .black.opacity(0.2), radius: 20, x: 0, y: 10)
                 )
+                .shadow(color: Color.black.opacity(0.2), radius: 20, x: 0, y: 10)
                 .padding(.horizontal, 30)
                 
                 // Name Input Card
@@ -141,8 +141,8 @@ struct ColorMatchingGame: View {
                 .background(
                     RoundedRectangle(cornerRadius: 20)
                         .fill(Color.white)
-                        .shadow(color: .black.opacity(0.2), radius: 20, x: 0, y: 10)
                 )
+                .shadow(color: .black.opacity(0.2), radius: 20, x: 0, y: 10)
                 .padding(.horizontal, 30)
             }
         }
@@ -175,32 +175,27 @@ struct ColorMatchingGame: View {
                         Image(systemName: "paintpalette.fill")
                             .font(.system(size: 40))
                             .foregroundColor(.white)
-                            .shadow(color: .black.opacity(0.2), radius: 4, x: 0, y: 2)
                     }
-                    .padding(.top, 40)
                     
-                    Text("COLOR MATCH")
-                        .font(.system(size: 34, weight: .heavy, design: .rounded))
+                    Text("Color Matching")
+                        .font(.system(size: 32, weight: .bold, design: .rounded))
                         .foregroundColor(.primary)
-                        .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
                     
-                    Text("Test Your Memory & Reflexes")
+                    Text("Test Your Memory & Speed")
                         .font(.system(size: 16, weight: .medium, design: .rounded))
                         .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 40)
                 }
-                .padding(.bottom, 40)
+                .padding(.vertical, 30)
                 
-                // Difficulty Selection Cards
-                VStack(spacing: 20) {
-                    Text("SELECT DIFFICULTY")
-                        .font(.system(size: 18, weight: .semibold, design: .rounded))
+                // Mode Cards
+                VStack(spacing: 16) {
+                    Text("Select Game Mode")
+                        .font(.system(size: 16, weight: .semibold))
                         .foregroundColor(.secondary)
-                        .tracking(1)
                         .padding(.bottom, 10)
                     
-                    ForEach(GameMode.allCases, id: \.self) { mode in
+                    // Original Modes
+                    ForEach(GameMode.allCases.filter { $0 != .levelUp }, id: \.self) { mode in
                         modernModeCard(mode: mode)
                             .onTapGesture {
                                 withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
@@ -208,6 +203,14 @@ struct ColorMatchingGame: View {
                                 }
                             }
                     }
+                    
+                    // NEW! Level Up Mode Card
+                    modernLevelUpModeCard()
+                        .onTapGesture {
+                            withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+                                viewModel.startGame(mode: .levelUp)
+                            }
+                        }
                     
                     // Quick Start Hint
                     Text("Tap any card to begin")
@@ -231,34 +234,30 @@ struct ColorMatchingGame: View {
                     Circle()
                         .fill(modeCardGradient(mode).opacity(0.9))
                         .frame(width: 50, height: 50)
-                        .shadow(color: modeCardShadowColor(mode), radius: 8, x: 0, y: 4)
                     
                     Image(systemName: modeIconName(mode))
-                        .font(.system(size: 22, weight: .semibold))
+                        .font(.system(size: 20, weight: .bold))
                         .foregroundColor(.white)
-                        .shadow(color: .black.opacity(0.2), radius: 2, x: 0, y: 1)
                 }
                 
-                VStack(alignment: .leading, spacing: 4) {
+                // Mode Info
+                VStack(alignment: .leading, spacing: 6) {
                     Text(mode.rawValue)
-                        .font(.system(size: 22, weight: .bold, design: .rounded))
-                        .foregroundColor(modePrimaryColor(mode))
+                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                        .foregroundColor(.primary)
                     
                     Text(modeDescription(mode))
-                        .font(.system(size: 13, design: .rounded))
+                        .font(.system(size: 13, weight: .medium, design: .rounded))
                         .foregroundColor(.secondary)
-                        .lineLimit(1)
                 }
                 
                 Spacer()
                 
-                // Chevron indicator
                 Image(systemName: "chevron.right.circle.fill")
-                    .font(.system(size: 22))
+                    .font(.system(size: 24))
                     .foregroundColor(modePrimaryColor(mode).opacity(0.7))
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 18)
+            .padding(20)
             
             // Card Divider
             Rectangle()
@@ -291,12 +290,110 @@ struct ColorMatchingGame: View {
         .background(
             RoundedRectangle(cornerRadius: 20)
                 .fill(Color.white)
-                .shadow(color: Color.black.opacity(0.08), radius: 20, x: 0, y: 10)
-                .shadow(color: modePrimaryColor(mode).opacity(0.05), radius: 30, x: 0, y: 20)
         )
+        .shadow(color: Color.black.opacity(0.08), radius: 20, x: 0, y: 10)
+        .shadow(color: modePrimaryColor(mode).opacity(0.05), radius: 30, x: 0, y: 20)
         .overlay(
             RoundedRectangle(cornerRadius: 20)
                 .stroke(Color.gray.opacity(0.1), lineWidth: 1)
+        )
+    }
+    
+    // NEW! Level Up Mode Card
+    private func modernLevelUpModeCard() -> some View {
+        VStack(spacing: 0) {
+            // Card Header with Icon
+            HStack(spacing: 16) {
+                // Icon Container with animated gradient
+                ZStack {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                gradient: Gradient(colors: [
+                                    Color(red: 1, green: 0.5, blue: 0),
+                                    Color(red: 1, green: 0.2, blue: 0),
+                                    Color(red: 1, green: 0.5, blue: 0)
+                                ]),
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 50, height: 50)
+                    
+                    Image(systemName: "arrow.up.circle.fill")
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundColor(.white)
+                }
+                
+                // Mode Info
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Level Up")
+                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                        .foregroundColor(.primary)
+                    
+                    Text("Progressive difficulty")
+                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                        .foregroundColor(.secondary)
+                }
+                
+                Spacer()
+                
+                VStack(alignment: .center, spacing: 2) {
+                    Image(systemName: "star.fill")
+                        .font(.system(size: 14))
+                        .foregroundColor(.yellow)
+                    Text("NEW!")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(.yellow)
+                }
+            }
+            .padding(20)
+            
+            // Card Divider
+            Rectangle()
+                .fill(Color.gray.opacity(0.1))
+                .frame(height: 1)
+                .padding(.horizontal, 20)
+            
+            // Stats Row
+            HStack(spacing: 0) {
+                statItem(icon: "1.circle.fill", value: "Start\nEasy")
+                
+                Divider()
+                    .frame(height: 20)
+                
+                statItem(icon: "5.circle.fill", value: "Grow\nGrid")
+                
+                Divider()
+                    .frame(height: 20)
+                
+                statItem(icon: "bolt.fill", value: "Speed\nUp")
+                
+                Divider()
+                    .frame(height: 20)
+                
+                statItem(icon: "target", value: "More\nMatches")
+            }
+            .padding(.vertical, 12)
+            .background(
+                LinearGradient(
+                    gradient: Gradient(colors: [
+                        Color(red: 1, green: 0.5, blue: 0).opacity(0.05),
+                        Color(red: 1, green: 0.2, blue: 0).opacity(0.05)
+                    ]),
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+            )
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color.white)
+        )
+        .shadow(color: Color.orange.opacity(0.15), radius: 20, x: 0, y: 10)
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(Color.orange.opacity(0.2), lineWidth: 2)
         )
     }
     
@@ -414,15 +511,28 @@ struct ColorMatchingGame: View {
                             .padding(.horizontal, 40)
                         }
                     } else {
-                        VStack(spacing: 4) {
-                            Text("Round \(viewModel.roundNumber)")
-                                .font(.system(size: 15, design: .rounded))
-                                .foregroundColor(.gray)
-                            
-                            if viewModel.currentMode.targetMatches > 1 {
-                                Text("Find \(viewModel.currentMode.targetMatches) matches")
+                        // NEW! Level Up mode display
+                        if viewModel.currentMode == .levelUp {
+                            VStack(spacing: 4) {
+                                Text("LEVEL \(viewModel.currentLevel)")
+                                    .font(.system(size: 18, weight: .bold, design: .rounded))
+                                    .foregroundColor(.orange)
+                                
+                                Text("Round \(viewModel.roundNumber)")
                                     .font(.system(size: 13, design: .rounded))
-                                    .foregroundColor(.blue)
+                                    .foregroundColor(.gray)
+                            }
+                        } else {
+                            VStack(spacing: 4) {
+                                Text("Round \(viewModel.roundNumber)")
+                                    .font(.system(size: 15, design: .rounded))
+                                    .foregroundColor(.gray)
+                                
+                                if viewModel.currentMode.targetMatches > 1 {
+                                    Text("Find \(viewModel.currentMode.targetMatches) matches")
+                                        .font(.system(size: 13, design: .rounded))
+                                        .foregroundColor(.blue)
+                                }
                             }
                         }
                     }
@@ -451,6 +561,8 @@ struct ColorMatchingGame: View {
                         .foregroundColor(.gray)
                         .padding(.bottom, 20)
                 }
+                
+                Spacer()
             }
         }
     }
@@ -514,12 +626,12 @@ struct ColorMatchingGame: View {
                     .foregroundColor(.secondary)
             }
             
-            Text("\(viewModel.timeRemaining)")
-                .font(.system(size: 32, weight: .bold, design: .rounded))
+            Text("\(viewModel.timeRemaining)s")
+                .font(.system(size: 24, weight: .bold, design: .rounded))
                 .foregroundColor(timeColor)
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 12)
+        .padding(.horizontal, 15)
+        .padding(.vertical, 10)
         .background(
             RoundedRectangle(cornerRadius: 15)
                 .fill(Color.white)
@@ -532,15 +644,14 @@ struct ColorMatchingGame: View {
             return .red
         } else if viewModel.timeRemaining <= 20 {
             return .orange
+        } else {
+            return .green
         }
-        return .green
     }
     
     private func modernGridView(screenWidth: CGFloat) -> some View {
+        let maxGridWidth = min(screenWidth - 32, 380)
         let gridSize = viewModel.currentMode.gridSize
-        
-        // Calculate maximum grid size
-        let maxGridWidth = screenWidth - 32
         let spacing: CGFloat = gridSize >= 5 ? 6 : 8
         let availableWidth = maxGridWidth - 24
         let tileSize = (availableWidth - CGFloat(gridSize - 1) * spacing) / CGFloat(gridSize)
@@ -563,7 +674,6 @@ struct ColorMatchingGame: View {
     private func modernTileView(_ tile: ColorTile, size: CGFloat) -> some View {
         Button(action: {
             guard viewModel.isGameActive && !viewModel.isRevealing else { return }
-            
             withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                 viewModel.tileTapped(tile)
             }
@@ -593,7 +703,6 @@ struct ColorMatchingGame: View {
                         .overlay(
                             RoundedRectangle(cornerRadius: 12)
                                 .stroke(
-                                    // Thicker white border for matching tiles
                                     Color.white,
                                     lineWidth: tile.color == viewModel.targetColor && tile.isRevealed ? 4 : 2
                                 )
@@ -611,14 +720,28 @@ struct ColorMatchingGame: View {
         .disabled(viewModel.isRevealing || !viewModel.isGameActive)
     }
     
-    // MARK: - Helper Functions for Mode Cards
+    private func statItem(icon: String, value: String) -> some View {
+        VStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 14))
+                .foregroundColor(.gray)
+                .frame(height: 14)
+            
+            Text(value)
+                .font(.system(size: 12, weight: .medium, design: .rounded))
+                .foregroundColor(.primary)
+        }
+        .frame(maxWidth: .infinity)
+    }
+    
+    // MARK: - Color and Style Helpers
     
     private func modeCardGradient(_ mode: GameMode) -> LinearGradient {
         switch mode {
         case .easy:
             return LinearGradient(
                 gradient: Gradient(colors: [
-                    Color(red: 0.2, green: 0.8, blue: 0.6),
+                    Color(red: 0.3, green: 0.9, blue: 0.4),
                     Color(red: 0.1, green: 0.7, blue: 0.5)
                 ]),
                 startPoint: .topLeading,
@@ -642,6 +765,15 @@ struct ColorMatchingGame: View {
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
+        case .levelUp:
+            return LinearGradient(
+                gradient: Gradient(colors: [
+                    Color(red: 1, green: 0.5, blue: 0),
+                    Color(red: 1, green: 0.2, blue: 0)
+                ]),
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
         }
     }
     
@@ -653,6 +785,8 @@ struct ColorMatchingGame: View {
             return Color.orange.opacity(0.3)
         case .hard:
             return Color.red.opacity(0.3)
+        case .levelUp:
+            return Color.orange.opacity(0.3)
         }
     }
     
@@ -664,6 +798,8 @@ struct ColorMatchingGame: View {
             return "flame.fill"
         case .hard:
             return "bolt.fill"
+        case .levelUp:
+            return "arrow.up.circle.fill"
         }
     }
     
@@ -675,6 +811,8 @@ struct ColorMatchingGame: View {
             return Color.orange
         case .hard:
             return Color.red
+        case .levelUp:
+            return Color.orange
         }
     }
     
@@ -686,21 +824,9 @@ struct ColorMatchingGame: View {
             return "Balanced challenge"
         case .hard:
             return "For memory masters"
+        case .levelUp:
+            return "Progressive difficulty"
         }
-    }
-    
-    private func statItem(icon: String, value: String) -> some View {
-        VStack(spacing: 6) {
-            Image(systemName: icon)
-                .font(.system(size: 14))
-                .foregroundColor(.gray)
-                .frame(height: 14)
-            
-            Text(value)
-                .font(.system(size: 12, weight: .medium, design: .rounded))
-                .foregroundColor(.primary)
-        }
-        .frame(maxWidth: .infinity)
     }
 }
 
@@ -712,4 +838,8 @@ struct ModernTileButtonStyle: ButtonStyle {
             .scaleEffect(configuration.isPressed ? 0.92 : 1)
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: configuration.isPressed)
     }
+}
+
+#Preview {
+    ColorMatchingGame()
 }

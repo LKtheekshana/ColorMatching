@@ -480,6 +480,7 @@ struct ScoreboardView: View {
         case .easy: return .green
         case .medium: return .orange
         case .hard: return .red
+        case .levelUp: return .orange  // NEW!
         }
     }
     

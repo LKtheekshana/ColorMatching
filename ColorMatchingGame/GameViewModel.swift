@@ -1,5 +1,6 @@
 import SwiftUI
 import Combine
+import FirebaseAuth
 
 struct HighScore: Identifiable, Codable {
     var id = UUID()
@@ -20,12 +21,14 @@ enum GameMode: String, CaseIterable, Codable {
     case easy = "Easy"
     case medium = "Medium"
     case hard = "Hard"
+    case levelUp = "Level Up"
     
     var gridSize: Int {
         switch self {
         case .easy: return 3
         case .medium: return 4
         case .hard: return 5
+        case .levelUp: return 3  // Starts at Easy
         }
     }
     
@@ -34,6 +37,7 @@ enum GameMode: String, CaseIterable, Codable {
         case .easy: return 30
         case .medium: return 45
         case .hard: return 60
+        case .levelUp: return 30  // Starts at Easy
         }
     }
     
@@ -42,6 +46,7 @@ enum GameMode: String, CaseIterable, Codable {
         case .easy: return 2.0
         case .medium: return 1.0
         case .hard: return 0.5
+        case .levelUp: return 2.0  // Starts at Easy
         }
     }
     
@@ -50,6 +55,7 @@ enum GameMode: String, CaseIterable, Codable {
         case .easy: return 1
         case .medium: return 2
         case .hard: return 3
+        case .levelUp: return 1  // Starts at Easy
         }
     }
 }
@@ -70,11 +76,18 @@ class GameViewModel: ObservableObject {
     @Published var totalMatchesInRound: Int = 1
     @Published var showNameInput: Bool = false
     @Published var playerName: String = ""
+    @Published var currentLevel: Int = 1  // NEW! For Level Up mode
     
     private var timer: Timer?
     private var revealTimer: Timer?
     private var hideTimer: Timer?
     private var highScores: [HighScore] = []
+    
+    // NEW! For Level Up mode difficulty progression
+    private var levelUpGridSize: Int = 3
+    private var levelUpTimeLimit: Int = 30
+    private var levelUpRevealTime: Double = 2.0
+    private var levelUpTargetMatches: Int = 1
     
     init() {
         loadHighScores()
@@ -91,6 +104,16 @@ class GameViewModel: ObservableObject {
         isGameStarted = true
         gameResult = ""
         showNameInput = false
+        currentLevel = 1  // NEW! Reset level
+        
+        // NEW! Initialize Level Up mode parameters
+        if mode == .levelUp {
+            levelUpGridSize = 3
+            levelUpTimeLimit = 30
+            levelUpRevealTime = 2.0
+            levelUpTargetMatches = 1
+        }
+        
         startNewRound()
     }
     
@@ -103,12 +126,14 @@ class GameViewModel: ObservableObject {
     }
     
     func generateGrid() {
-        let size = currentMode.gridSize
+        let size = currentMode == .levelUp ? levelUpGridSize : currentMode.gridSize
+        let targetMatches = currentMode == .levelUp ? levelUpTargetMatches : currentMode.targetMatches
+        
         let totalTiles = size * size
         
         // Generate unique random colors
         var colors: [Color] = []
-        for _ in 0..<(totalTiles - currentMode.targetMatches) {
+        for _ in 0..<(totalTiles - targetMatches) {
             colors.append(generateRandomColor())
         }
         
@@ -116,7 +141,7 @@ class GameViewModel: ObservableObject {
         targetColor = generateRandomColor()
         
         // Add target color multiple times based on difficulty
-        for _ in 0..<currentMode.targetMatches {
+        for _ in 0..<targetMatches {
             colors.append(targetColor)
         }
         
@@ -144,33 +169,36 @@ class GameViewModel: ObservableObject {
         revealTimer?.invalidate()
         hideTimer?.invalidate()
         
-        // Reset reveal progress
-        revealProgress = 0.0
         isRevealing = true
+        revealProgress = 0.0
         
-        // Reveal all tiles
-        for i in 0..<tiles.count {
-            tiles[i].isRevealed = true
-            tiles[i].isHidden = false
-        }
-        objectWillChange.send()
+        let revealDuration = currentMode == .levelUp ? levelUpRevealTime : currentMode.revealTime
+        let updateInterval = 0.05
+        let steps = Int(revealDuration / updateInterval)
+        var currentStep = 0
         
-        // Start reveal timer (progress bar)
-        let revealDuration = currentMode.revealTime
-        revealTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
+        revealTimer = Timer.scheduledTimer(withTimeInterval: updateInterval, repeats: true) { [weak self] _ in
             guard let self = self else { return }
             
-            self.revealProgress += 0.05 / revealDuration
+            currentStep += 1
+            self.revealProgress = Double(currentStep) / Double(steps)
             
-            if self.revealProgress >= 1.0 {
+            if currentStep >= steps {
+                self.revealProgress = 1.0
                 self.revealTimer?.invalidate()
-                self.hideColors()
+                self.revealTimer = nil
+                
+                // Reveal all tiles
+                for i in 0..<self.tiles.count {
+                    self.tiles[i].isRevealed = true
+                }
+                self.objectWillChange.send()
+                
+                // Hide after delay
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    self.hideColors()
+                }
             }
-        }
-        
-        // Set timer to hide colors
-        hideTimer = Timer.scheduledTimer(withTimeInterval: revealDuration, repeats: false) { [weak self] _ in
-            self?.hideColors()
         }
     }
     
@@ -204,7 +232,10 @@ class GameViewModel: ObservableObject {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                 if tile.color == self.targetColor {
                     self.matchesFound += 1
-                    self.score += 10 * self.currentMode.gridSize
+                    
+                    // Add points based on mode
+                    let gridSize = self.currentMode == .levelUp ? self.levelUpGridSize : self.currentMode.gridSize
+                    self.score += 10 * gridSize
                     
                     // Mark this tile as found (keep it revealed)
                     self.tiles[index].isHidden = false
@@ -212,7 +243,12 @@ class GameViewModel: ObservableObject {
                     // Check if all matches are found
                     if self.matchesFound >= self.totalMatchesInRound {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                            self.startNewRound()
+                            // NEW! Check if Level Up mode
+                            if self.currentMode == .levelUp {
+                                self.levelUp()  // Level up instead of next round
+                            } else {
+                                self.startNewRound()
+                            }
                         }
                     }
                 } else {
@@ -264,17 +300,88 @@ class GameViewModel: ObservableObject {
         }
     }
     
+    // NEW! Level Up method
+    private func levelUp() {
+        currentLevel += 1
+        roundNumber = 0
+        
+        // Increase difficulty based on level
+        let nextGridSize: Int
+        let nextTimeLimit: Int
+        let nextRevealTime: Double
+        let nextTargetMatches: Int
+        
+        switch currentLevel {
+        case 1:
+            nextGridSize = 3
+            nextTimeLimit = 30
+            nextRevealTime = 2.0
+            nextTargetMatches = 1
+        case 2:
+            nextGridSize = 3
+            nextTimeLimit = 25
+            nextRevealTime = 1.8
+            nextTargetMatches = 1
+        case 3:
+            nextGridSize = 4
+            nextTimeLimit = 20
+            nextRevealTime = 1.5
+            nextTargetMatches = 2
+        case 4:
+            nextGridSize = 4
+            nextTimeLimit = 18
+            nextRevealTime = 1.2
+            nextTargetMatches = 2
+        case 5:
+            nextGridSize = 5
+            nextTimeLimit = 15
+            nextRevealTime = 1.0
+            nextTargetMatches = 2
+        case 6:
+            nextGridSize = 5
+            nextTimeLimit = 12
+            nextRevealTime = 0.8
+            nextTargetMatches = 3
+        default:
+            // Continue with hardest level
+            nextGridSize = 5
+            nextTimeLimit = max(10, 15 - currentLevel)
+            nextRevealTime = max(0.5, 1.0 - Double(currentLevel - 6) * 0.1)
+            nextTargetMatches = 3
+        }
+        
+        // Update Level Up mode parameters
+        levelUpGridSize = nextGridSize
+        levelUpTimeLimit = nextTimeLimit
+        levelUpRevealTime = nextRevealTime
+        levelUpTargetMatches = nextTargetMatches
+        
+        timeRemaining = nextTimeLimit
+        matchesFound = 0
+        totalMatchesInRound = nextTargetMatches
+        
+        // Show level up message before starting new level
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            self.score += 50  // Bonus for leveling up
+            print("✅ Level Up! Now at Level \(self.currentLevel)")
+            self.generateGrid()
+            self.revealColorsTemporarily()
+        }
+    }
+    
     func saveScore() {
         guard !playerName.isEmpty else { return }
         
+        // NEW! For Level Up mode, save with level info in name
+        let displayName = currentMode == .levelUp ? "\(playerName) (Lvl \(currentLevel))" : playerName
+        
         let newHighScore = HighScore(
-            name: playerName,
+            name: displayName,
             score: score,
             mode: currentMode.rawValue,
             date: Date()
         )
         
-        // Add to local storage
         highScores.append(newHighScore)
         highScores.sort { $0.score > $1.score }
         highScores = Array(highScores.prefix(30))
@@ -282,7 +389,7 @@ class GameViewModel: ObservableObject {
         saveHighScores()
         savePlayerName()
         
-        // NEW: Save to Firebase
+        // Save to Firebase
         FirebaseManager.shared.saveHighScore(newHighScore) { error in
             if let error = error {
                 print("❌ Firebase save error: \(error.localizedDescription)")
@@ -294,26 +401,8 @@ class GameViewModel: ObservableObject {
         showNameInput = false
     }
     
-    // Add this to GameViewModel class
-    func loadHighScoresFromFirebase() {
-        let mode = currentMode.rawValue
-        FirebaseManager.shared.fetchHighScores(for: mode) { scores, error in
-            if let error = error {
-                print("Error loading scores: \(error.localizedDescription)")
-                return
-            }
-            
-            if let scores = scores {
-                DispatchQueue.main.async {
-                    self.highScores = scores
-                }
-            }
-        }
-    }
-    
     private func isHighScore() -> Bool {
         let modeScores = highScores.filter { $0.mode == currentMode.rawValue }
-        // Consider it a high score if it's in top 10 for that mode
         return modeScores.count < 10 || score > (modeScores.last?.score ?? 0)
     }
     
@@ -329,12 +418,12 @@ class GameViewModel: ObservableObject {
     func resetGame() {
         isGameActive = false
         isGameStarted = false
-        isRevealing = false
-        matchesFound = 0
-        showNameInput = false
         timer?.invalidate()
         revealTimer?.invalidate()
         hideTimer?.invalidate()
+        isRevealing = false
+        matchesFound = 0
+        showNameInput = false
         generateGrid()
     }
     
